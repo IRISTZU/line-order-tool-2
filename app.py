@@ -74,4 +74,5 @@ if uploaded_files:
             "下載Excel",
             data=output,
             file_name="LINE訂餐統計.xlsx",
-            mime="
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )

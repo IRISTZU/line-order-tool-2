@@ -58,19 +58,18 @@ if uploaded_files:
                     if not line:
                         continue
 
+                    # 略過總計
+                    if "總計" in line:
+                        continue
+
                     # 判斷姓名
                     if (
-                        "x1" not in line
-                        and "X1" not in line
+                        "x1" not in line.lower()
                         and "$" not in line
-                        and "總計" not in line
                         and len(line) < 30
                     ):
 
-                        if not re.search(
-                            r"^\d+$",
-                            line
-                        ):
+                        if not re.match(r"^\d+$", line):
                             current_name = line
 
                     # 判斷餐點
@@ -107,9 +106,7 @@ if uploaded_files:
 
             except Exception as e:
 
-                st.error(
-                    f"{file.name} 辨識失敗"
-                )
+                st.error(f"{file.name} 辨識失敗")
                 st.write(str(e))
 
         if len(orders) == 0:
@@ -118,18 +115,11 @@ if uploaded_files:
 
         else:
 
-            detail_df = pd.DataFrame(orders)
+            df = pd.DataFrame(orders)
 
-            st.subheader("訂單明細")
-
-            st.dataframe(
-                detail_df,
-                use_container_width=True
-            )
-
-            # 同一人合併
+            # 人員訂單彙總
             person_df = (
-                detail_df.groupby("姓名")
+                df.groupby("姓名")
                 .agg({
                     "數量": "sum",
                     "餐點名稱": lambda x: "、".join(x),
@@ -147,7 +137,7 @@ if uploaded_files:
 
             # 餐點統計
             item_df = (
-                detail_df.groupby("餐點名稱")
+                df.groupby("餐點名稱")
                 .agg({
                     "數量": "sum",
                     "金額": "sum"
@@ -162,29 +152,20 @@ if uploaded_files:
                 use_container_width=True
             )
 
-            total_amount = (
-                person_df["金額"]
-                .sum()
-            )
+            total_amount = person_df["金額"].sum()
 
             st.metric(
                 "訂單總金額",
                 f"${total_amount:,}"
             )
 
-            # Excel
+            # 匯出 Excel
             output = io.BytesIO()
 
             with pd.ExcelWriter(
                 output,
                 engine="openpyxl"
             ) as writer:
-
-                detail_df.to_excel(
-                    writer,
-                    sheet_name="訂單明細",
-                    index=False
-                )
 
                 person_df.to_excel(
                     writer,
@@ -201,7 +182,7 @@ if uploaded_files:
             output.seek(0)
 
             st.download_button(
-                "下載Excel",
+                label="下載Excel",
                 data=output,
                 file_name="LINE訂餐統計.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -1,6 +1,8 @@
 streamlit
+easyocr
+numpy
 pandas
 openpyxl
 pillow
-easyocr
-numpy
+torch
+torchvision

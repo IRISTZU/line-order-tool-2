@@ -4,7 +4,7 @@ import requests
 import io
 
 # OCR.Space API Key
-API_KEY = "YOUR_API_KEY"
+API_KEY = "K87167491488957"
 
 st.set_page_config(page_title="LINE訂餐OCR")
 st.title("LINE訂餐OCR")
@@ -36,7 +36,7 @@ if uploaded_files:
                     )
                 },
                 data={
-                    "K87167491488957": API_KEY,
+                    "apikey": API_KEY,
                     "language": "cht"
                 }
             )

@@ -1,8 +1,7 @@
 import streamlit as st
 import requests
-from PIL import Image
 
-API_KEY = "你的APIKEY"
+API_KEY = "K87167491488957"
 
 st.title("LINE訂餐OCR")
 
@@ -19,21 +18,27 @@ if files:
 
             response = requests.post(
                 "https://api.ocr.space/parse/image",
-                files={"filename": file},
+                files={
+                    "filename": (
+                        file.name,
+                        file.getvalue()
+                    )
+                },
                 data={
-                    "K87167491488957": API_KEY,
+                    "apikey": API_KEY,
                     "language": "cht"
                 }
             )
 
             result = response.json()
 
+            st.json(result)
+
             try:
                 text = result["ParsedResults"][0]["ParsedText"]
 
                 st.subheader(file.name)
-
                 st.text(text)
 
-            except:
+            except Exception:
                 st.error(f"{file.name} 辨識失敗")

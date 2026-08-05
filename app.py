@@ -32,7 +32,12 @@ if files:
 
             result = response.json()
 
-            st.json(result)
+            text = result["ParsedResults"][0]["ParsedText"]
+
+            st.subheader(file.name)
+
+            st.text(text)
+            ``
 
             try:
                 text = result["ParsedResults"][0]["ParsedText"]

@@ -21,7 +21,7 @@ if files:
                 "https://api.ocr.space/parse/image",
                 files={"filename": file},
                 data={
-                    "apikey": API_KEY,
+                    "K87167491488957": API_KEY,
                     "language": "cht"
                 }
             )

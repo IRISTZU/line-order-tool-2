@@ -5,7 +5,7 @@ import io
 import re
 
 # OCR.Space API Key
-API_KEY = "你的APIKEY"
+API_KEY = "K87167491488957"
 
 st.set_page_config(page_title="LINE訂餐整理工具")
 

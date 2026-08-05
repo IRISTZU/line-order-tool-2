@@ -1,8 +1,2 @@
 streamlit
-easyocr
-numpy
-pandas
-openpyxl
-pillow
-torch
-torchvision
+``

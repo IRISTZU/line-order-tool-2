@@ -4,7 +4,8 @@ import requests
 import io
 import re
 
-API_KEY = "K87167491488957"
+# OCR.Space API Key
+API_KEY = "你的APIKEY"
 
 st.set_page_config(page_title="LINE訂餐整理工具")
 
@@ -25,8 +26,6 @@ if uploaded_files:
         orders = []
 
         for file in uploaded_files:
-
-            st.subheader(file.name)
 
             response = requests.post(
                 "https://api.ocr.space/parse/image",
@@ -52,71 +51,128 @@ if uploaded_files:
 
                 current_name = ""
 
-                for line in lines:
+                for i, line in enumerate(lines):
 
                     line = line.strip()
 
                     if not line:
                         continue
 
-                    # 姓名判斷
+                    # 判斷姓名
                     if (
                         "x1" not in line
+                        and "X1" not in line
                         and "$" not in line
-                        and not re.match(r"^\\d+$", line)
                         and "總計" not in line
+                        and len(line) < 30
                     ):
 
-                        if len(line) < 30:
+                        if not re.search(
+                            r"^\d+$",
+                            line
+                        ):
                             current_name = line
 
-                    # 餐點判斷
-                    if "x1" in line:
+                    # 判斷餐點
+                    if "x1" in line.lower():
 
-                        item = (
-                            line.replace("x1", "")
-                            .replace("X1", "")
-                            .strip()
-                        )
+                        item = re.sub(
+                            r"[xX]1",
+                            "",
+                            line
+                        ).strip()
+
+                        price = 0
+
+                        if i + 1 < len(lines):
+
+                            next_line = (
+                                lines[i + 1]
+                                .replace("$", "")
+                                .replace(",", "")
+                                .strip()
+                            )
+
+                            if next_line.isdigit():
+                                price = int(next_line)
 
                         orders.append(
                             {
                                 "姓名": current_name,
                                 "數量": 1,
-                                "餐點名稱": item
+                                "餐點名稱": item,
+                                "金額": price
                             }
                         )
 
             except Exception as e:
 
-                st.error(f"{file.name} 辨識失敗")
-                st.write(result)
+                st.error(
+                    f"{file.name} 辨識失敗"
+                )
                 st.write(str(e))
 
-        if len(orders) > 0:
+        if len(orders) == 0:
 
-            df = pd.DataFrame(orders)
+            st.warning("沒有解析到訂單資料")
+
+        else:
+
+            detail_df = pd.DataFrame(orders)
 
             st.subheader("訂單明細")
 
             st.dataframe(
-                df,
+                detail_df,
                 use_container_width=True
             )
 
-            summary = (
-                df.groupby("餐點名稱")["數量"]
-                .sum()
+            # 同一人合併
+            person_df = (
+                detail_df.groupby("姓名")
+                .agg({
+                    "數量": "sum",
+                    "餐點名稱": lambda x: "、".join(x),
+                    "金額": "sum"
+                })
+                .reset_index()
+            )
+
+            st.subheader("人員訂單彙總")
+
+            st.dataframe(
+                person_df,
+                use_container_width=True
+            )
+
+            # 餐點統計
+            item_df = (
+                detail_df.groupby("餐點名稱")
+                .agg({
+                    "數量": "sum",
+                    "金額": "sum"
+                })
                 .reset_index()
             )
 
             st.subheader("餐點統計")
 
             st.dataframe(
-                summary,
+                item_df,
                 use_container_width=True
             )
 
+            total_amount = (
+                person_df["金額"]
+                .sum()
+            )
+
+            st.metric(
+                "訂單總金額",
+                f"${total_amount:,}"
+            )
+
+            # Excel
             output = io.BytesIO()
 
             with pd.ExcelWriter(
@@ -124,13 +180,19 @@ if uploaded_files:
                 engine="openpyxl"
             ) as writer:
 
-                df.to_excel(
+                detail_df.to_excel(
                     writer,
                     sheet_name="訂單明細",
                     index=False
                 )
 
-                summary.to_excel(
+                person_df.to_excel(
+                    writer,
+                    sheet_name="人員訂單彙總",
+                    index=False
+                )
+
+                item_df.to_excel(
                     writer,
                     sheet_name="餐點統計",
                     index=False
@@ -144,7 +206,3 @@ if uploaded_files:
                 file_name="LINE訂餐統計.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
-        else:
-
-            st.warning("沒有解析到訂單資料")

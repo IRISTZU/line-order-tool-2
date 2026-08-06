@@ -7,30 +7,21 @@ import re
 API_KEY = "K87167491488957"
 
 NAME_MAPPING = {
-    "賴泱儒─聯華": "賴泱儒",
-    "賴泱儒_聯華": "賴泱儒",
-    "LiuYuTsan": "柳育燦",
     "LLH廖仲志": "廖仲志",
-    "廖仲志": "廖仲志",
-    "ruihua(瑞鏵)_聯華": "黃瑞鏵",
-    "Cenwei": "嚴岑葳",
-    "dowayhome": "杜韋弘",
+    "Maggie_Chen": "陳美琪",
+    "Travis柏傑": "陳柏宏",
+    "LiuYuTsan": "柳育燦",
+    "賴泱儒_聯華": "賴泱儒",
+    "賴泱儒─聯華": "賴泱儒",
     "林哲民": "林哲民",
     "陳冠中": "陳冠中",
     "佑瑄": "陳佑瑄",
     "安迪 Cohen": "柯安迪",
-    "柏宏_聯華": "陳柏宏",
-    "立哲": "林立哲",
-    "林立哲": "林立哲",
-    "第三方工安_周冠旻": "周冠旻",
-    "第三方工安_诺倢": "蕭渃倢",
-    "第三方工安_盈君": "林盈君",
-    "第三方工安_魏久棣": "魏久棣",
-    "聯亞-林倉志": "林倉志",
-    "JH.ChenTM(建宏經理PM)": "陳建宏"
+    "立哲": "林立哲"
 }
 
 st.set_page_config(page_title="LINE訂餐整理工具")
+
 st.title("LINE訂餐整理工具")
 
 uploaded_files = st.file_uploader(
@@ -72,60 +63,44 @@ if uploaded_files:
 
                 text = result["ParsedResults"][0]["ParsedText"]
 
-                st.subheader(file.name)
-                st.text(text)
-
                 lines = text.splitlines()
 
                 current_name = ""
 
-                for line in lines:
+                for i, line in enumerate(lines):
 
                     line = line.strip()
 
                     if not line:
                         continue
 
+                    # 排除標題
                     if (
                         "LINE揪團" in line
                         or "名單統計" in line
+                        or "選項統計" in line
                         or "總計" in line
                     ):
                         continue
 
-                    # 判斷姓名
+                    # 判斷人名
                     if (
-                        "x1" not in line.lower()
-                        and "(1" not in line
-                        and "（1" not in line
-                        and "$" not in line
+                        "$" not in line
+                        and "x 1" not in line.lower()
+                        and "x1" not in line.lower()
                         and len(line) < 40
                     ):
+                        current_name = line
 
-                        if (
-                            "丼" not in line
-                            and "餐盒" not in line
-                            and "便當" not in line
-                            and "飲料" not in line
-                            and "檸檬" not in line
-                            and "紅茶" not in line
-                        ):
-                            current_name = line
-
-                    # 判斷餐點
-                    is_food = (
-                        "x1" in line.lower()
-                        or "(1" in line
-                        or "（1" in line
-                        or "丼" in line
-                        or "餐盒" in line
-                        or "便當" in line
-                    )
-
-                    if is_food:
+                    # 判斷餐點/飲料
+                    if (
+                        "x 1" in line.lower()
+                        or "x1" in line.lower()
+                        or "×1" in line
+                    ):
 
                         item = re.sub(
-                            r"[xX×]1|\(1|\（1",
+                            r"\s*[xX×]\s*1",
                             "",
                             line
                         ).strip()
@@ -135,14 +110,25 @@ if uploaded_files:
                             current_name
                         )
 
-                        orders.append(
-                            {
-                                "姓名": excel_name,
-                                "數量": 1,
-                                "餐點名稱": item,
-                                "金額": 0
-                            }
-                        )
+                        price = 0
+
+                        if i + 1 < len(lines):
+
+                            price_text = re.sub(
+                                r"[^\d]",
+                                "",
+                                lines[i + 1]
+                            )
+
+                            if price_text.isdigit():
+                                price = int(price_text)
+
+                        orders.append({
+                            "姓名": excel_name,
+                            "餐點名稱": item,
+                            "數量": 1,
+                            "金額": price
+                        })
 
             except Exception as e:
 
@@ -155,19 +141,20 @@ if uploaded_files:
 
         else:
 
-            detail_df = pd.DataFrame(orders)
+            df = pd.DataFrame(orders)
 
             person_df = (
-                detail_df.groupby("姓名")
+                df.groupby("姓名")
                 .agg({
                     "數量": "sum",
-                    "餐點名稱": lambda x: "、".join(x)
+                    "餐點名稱": lambda x: "、".join(x),
+                    "金額": "sum"
                 })
                 .reset_index()
             )
 
             item_df = (
-                detail_df.groupby("餐點名稱")
+                df.groupby("餐點名稱")
                 .agg({
                     "數量": "sum"
                 })
@@ -175,10 +162,17 @@ if uploaded_files:
             )
 
             st.subheader("人員訂單彙總")
-            st.dataframe(person_df)
+            st.dataframe(person_df, use_container_width=True)
 
             st.subheader("餐點統計")
-            st.dataframe(item_df)
+            st.dataframe(item_df, use_container_width=True)
+
+            total_amount = df["金額"].sum()
+
+            st.metric(
+                "訂單總金額",
+                f"${total_amount:,}"
+            )
 
             output = io.BytesIO()
 

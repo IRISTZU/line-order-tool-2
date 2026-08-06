@@ -188,4 +188,50 @@ if uploaded_files:
                 .reset_index()
             )
 
-            item_
+            item_df = (
+                detail_df.groupby("餐點名稱")
+                .agg({
+                    "數量": "sum",
+                    "金額": "sum"
+                })
+                .reset_index()
+            )
+
+            st.subheader("人員訂單彙總")
+            st.dataframe(person_df, use_container_width=True)
+
+            st.subheader("餐點統計")
+            st.dataframe(item_df, use_container_width=True)
+
+            st.metric(
+                "訂單總金額",
+                f"${detail_df['金額'].sum():,}"
+            )
+
+            output = io.BytesIO()
+
+            with pd.ExcelWriter(
+                output,
+                engine="openpyxl"
+            ) as writer:
+
+                person_df.to_excel(
+                    writer,
+                    sheet_name="人員訂單彙總",
+                    index=False
+                )
+
+                item_df.to_excel(
+                    writer,
+                    sheet_name="餐點統計",
+                    index=False
+                )
+
+            output.seek(0)
+
+            st.download_button(
+                "下載Excel",
+                data=output,
+                file_name="LINE訂餐統計.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )

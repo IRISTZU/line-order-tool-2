@@ -4,51 +4,66 @@ import requests
 import io
 import re
 
-# OCR.Space API Key
 API_KEY = "K87167491488957"
-
-# 指定抓取的人員
-TARGET_USERS = {
-    "賴泱儒_聯華",
-    "Brian Hsiao 蕭有玉",
-    "LiuYuTsan",
-    "LLH廖仲志",
-    "ruihua(瑞鏵)_聯華",
-    "Cenwei",
-    "dowayhome",
-    "林哲民",
-    "陳冠中",
-    "佑瑄",
-    "安迪 Cohen",
-    "柏宏_聯華",
-    "立哲",
-    "第三方工安_周冠旻",
-    "第三方工安_诺倢",
-    "第三方工安_盈君",
-    "第三方工安_魏久棣",
-    "聯亞-林倉志"
-}
 
 # LINE名稱轉正式姓名
 NAME_MAPPING = {
     "賴泱儒_聯華": "賴泱儒",
     "Brian Hsiao 蕭有玉": "蕭有玉",
+    "Brian Hsiao": "蕭有玉",
+    "蕭有玉": "蕭有玉",
     "LiuYuTsan": "柳育燦",
+    "柳育燦": "柳育燦",
     "LLH廖仲志": "廖仲志",
+    "廖仲志": "廖仲志",
     "ruihua(瑞鏵)_聯華": "黃瑞鏵",
+    "黃瑞鏵": "黃瑞鏵",
     "Cenwei": "嚴岑葳",
+    "嚴岑葳": "嚴岑葳",
     "dowayhome": "杜韋弘",
+    "杜韋弘": "杜韋弘",
     "林哲民": "林哲民",
     "陳冠中": "陳冠中",
     "佑瑄": "陳佑瑄",
+    "陳佑瑄": "陳佑瑄",
     "安迪 Cohen": "柯安迪",
+    "柯安迪": "柯安迪",
     "柏宏_聯華": "陳柏宏",
+    "陳柏宏": "陳柏宏",
     "立哲": "林立哲",
+    "林立哲": "林立哲",
     "第三方工安_周冠旻": "周冠旻",
+    "周冠旻": "周冠旻",
     "第三方工安_诺倢": "蕭渃倢",
+    "蕭渃倢": "蕭渃倢",
     "第三方工安_盈君": "林盈君",
+    "林盈君": "林盈君",
     "第三方工安_魏久棣": "魏久棣",
-    "聯亞-林倉志": "林倉志"
+    "魏久棣": "魏久棣",
+    "聯亞-林倉志": "林倉志",
+    "林倉志": "林倉志"
+}
+
+# 最終要保留的人員
+TARGET_NAMES = {
+    "賴泱儒",
+    "蕭有玉",
+    "柳育燦",
+    "廖仲志",
+    "黃瑞鏵",
+    "嚴岑葳",
+    "杜韋弘",
+    "林哲民",
+    "陳冠中",
+    "陳佑瑄",
+    "柯安迪",
+    "陳柏宏",
+    "林立哲",
+    "周冠旻",
+    "蕭渃倢",
+    "林盈君",
+    "魏久棣",
+    "林倉志"
 }
 
 st.set_page_config(page_title="LINE訂餐整理工具")
@@ -90,7 +105,6 @@ if uploaded_files:
                 result = response.json()
 
                 if "ParsedResults" not in result:
-                    st.error(f"{file.name} OCR失敗")
                     continue
 
                 text = result["ParsedResults"][0]["ParsedText"]
@@ -109,7 +123,6 @@ if uploaded_files:
                     if "總計" in line:
                         continue
 
-                    # 判斷姓名
                     if (
                         "x1" not in line.lower()
                         and "$" not in line
@@ -118,7 +131,6 @@ if uploaded_files:
                     ):
                         current_name = line
 
-                    # 判斷餐點
                     if "x1" in line.lower():
 
                         item = re.sub(
@@ -141,12 +153,12 @@ if uploaded_files:
                             if next_line.isdigit():
                                 price = int(next_line)
 
-                        if current_name.strip() in TARGET_USERS:
+                        excel_name = NAME_MAPPING.get(
+                            current_name,
+                            current_name
+                        )
 
-                            excel_name = NAME_MAPPING.get(
-                                current_name.strip(),
-                                current_name.strip()
-                            )
+                        if excel_name in TARGET_NAMES:
 
                             orders.append({
                                 "姓名": excel_name,
@@ -156,9 +168,7 @@ if uploaded_files:
                             })
 
             except Exception as e:
-
-                st.error(f"{file.name} 辨識失敗")
-                st.write(str(e))
+                st.error(f"{file.name} 辨識失敗：{e}")
 
         if len(orders) == 0:
 
@@ -168,10 +178,8 @@ if uploaded_files:
 
             detail_df = pd.DataFrame(orders)
 
-            # 人員訂單彙總
             person_df = (
-                detail_df
-                .groupby("姓名")
+                detail_df.groupby("姓名")
                 .agg({
                     "數量": "sum",
                     "餐點名稱": lambda x: "、".join(x),
@@ -180,54 +188,4 @@ if uploaded_files:
                 .reset_index()
             )
 
-            # 餐點統計
-            item_df = (
-                detail_df
-                .groupby("餐點名稱")
-                .agg({
-                    "數量": "sum",
-                    "金額": "sum"
-                })
-                .reset_index()
-            )
-
-            st.subheader("人員訂單彙總")
-            st.dataframe(person_df, use_container_width=True)
-
-            st.subheader("餐點統計")
-            st.dataframe(item_df, use_container_width=True)
-
-            total_amount = detail_df["金額"].sum()
-
-            st.metric(
-                "訂單總金額",
-                f"${total_amount:,}"
-            )
-
-            output = io.BytesIO()
-
-            with pd.ExcelWriter(
-                output,
-                engine="openpyxl"
-            ) as writer:
-
-                person_df.to_excel(
-                    writer,
-                    sheet_name="人員訂單彙總",
-                    index=False
-                )
-
-                item_df.to_excel(
-                    writer,
-                    sheet_name="餐點統計",
-                    index=False
-                )
-
-            output.seek(0)
-
-            st.download_button(
-                "下載Excel",
-                data=output,
-                file_name="LINE訂餐統計.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
+            item_

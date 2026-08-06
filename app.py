@@ -6,66 +6,6 @@ import re
 
 API_KEY = "K87167491488957"
 
-# LINE名稱轉正式姓名
-NAME_MAPPING = {
-    "賴泱儒_聯華": "賴泱儒",
-    "Brian Hsiao 蕭有玉": "蕭有玉",
-    "Brian Hsiao": "蕭有玉",
-    "蕭有玉": "蕭有玉",
-    "LiuYuTsan": "柳育燦",
-    "柳育燦": "柳育燦",
-    "LLH廖仲志": "廖仲志",
-    "廖仲志": "廖仲志",
-    "ruihua(瑞鏵)_聯華": "黃瑞鏵",
-    "黃瑞鏵": "黃瑞鏵",
-    "Cenwei": "嚴岑葳",
-    "嚴岑葳": "嚴岑葳",
-    "dowayhome": "杜韋弘",
-    "杜韋弘": "杜韋弘",
-    "林哲民": "林哲民",
-    "陳冠中": "陳冠中",
-    "佑瑄": "陳佑瑄",
-    "陳佑瑄": "陳佑瑄",
-    "安迪 Cohen": "柯安迪",
-    "柯安迪": "柯安迪",
-    "柏宏_聯華": "陳柏宏",
-    "陳柏宏": "陳柏宏",
-    "立哲": "林立哲",
-    "林立哲": "林立哲",
-    "第三方工安_周冠旻": "周冠旻",
-    "周冠旻": "周冠旻",
-    "第三方工安_诺倢": "蕭渃倢",
-    "蕭渃倢": "蕭渃倢",
-    "第三方工安_盈君": "林盈君",
-    "林盈君": "林盈君",
-    "第三方工安_魏久棣": "魏久棣",
-    "魏久棣": "魏久棣",
-    "聯亞-林倉志": "林倉志",
-    "林倉志": "林倉志"
-}
-
-# 最終要保留的人員
-TARGET_NAMES = {
-    "賴泱儒",
-    "蕭有玉",
-    "柳育燦",
-    "廖仲志",
-    "黃瑞鏵",
-    "嚴岑葳",
-    "杜韋弘",
-    "林哲民",
-    "陳冠中",
-    "陳佑瑄",
-    "柯安迪",
-    "陳柏宏",
-    "林立哲",
-    "周冠旻",
-    "蕭渃倢",
-    "林盈君",
-    "魏久棣",
-    "林倉志"
-}
-
 st.set_page_config(page_title="LINE訂餐整理工具")
 
 st.title("LINE訂餐整理工具")
@@ -109,6 +49,9 @@ if uploaded_files:
 
                 text = result["ParsedResults"][0]["ParsedText"]
 
+                st.subheader(file.name)
+                st.text(text)
+
                 lines = text.splitlines()
 
                 current_name = ""
@@ -123,6 +66,7 @@ if uploaded_files:
                     if "總計" in line:
                         continue
 
+                    # 判斷姓名
                     if (
                         "x1" not in line.lower()
                         and "$" not in line
@@ -131,10 +75,15 @@ if uploaded_files:
                     ):
                         current_name = line
 
-                    if "x1" in line.lower():
+                    # 判斷餐點
+                    if (
+                        "x1" in line.lower()
+                        or " x1" in line.lower()
+                        or "×1" in line
+                    ):
 
                         item = re.sub(
-                            r"[xX]1",
+                            r"[xX×]\s*1",
                             "",
                             line
                         ).strip()
@@ -153,33 +102,31 @@ if uploaded_files:
                             if next_line.isdigit():
                                 price = int(next_line)
 
-                        excel_name = NAME_MAPPING.get(
-                            current_name,
-                            current_name
-                        )
-
-                        if excel_name in TARGET_NAMES:
-
-                            orders.append({
-                                "姓名": excel_name,
+                        orders.append(
+                            {
+                                "姓名": current_name,
                                 "數量": 1,
                                 "餐點名稱": item,
                                 "金額": price
-                            })
+                            }
+                        )
 
             except Exception as e:
-                st.error(f"{file.name} 辨識失敗：{e}")
+
+                st.error(f"{file.name} 辨識失敗")
+                st.write(str(e))
 
         if len(orders) == 0:
 
-            st.warning("沒有找到符合條件的人員")
+            st.warning("沒有解析到訂單資料")
 
         else:
 
             detail_df = pd.DataFrame(orders)
 
             person_df = (
-                detail_df.groupby("姓名")
+                detail_df
+                .groupby("姓名")
                 .agg({
                     "數量": "sum",
                     "餐點名稱": lambda x: "、".join(x),
@@ -189,7 +136,8 @@ if uploaded_files:
             )
 
             item_df = (
-                detail_df.groupby("餐點名稱")
+                detail_df
+                .groupby("餐點名稱")
                 .agg({
                     "數量": "sum",
                     "金額": "sum"
@@ -198,14 +146,22 @@ if uploaded_files:
             )
 
             st.subheader("人員訂單彙總")
-            st.dataframe(person_df, use_container_width=True)
+            st.dataframe(
+                person_df,
+                use_container_width=True
+            )
 
             st.subheader("餐點統計")
-            st.dataframe(item_df, use_container_width=True)
+            st.dataframe(
+                item_df,
+                use_container_width=True
+            )
+
+            total_amount = detail_df["金額"].sum()
 
             st.metric(
                 "訂單總金額",
-                f"${detail_df['金額'].sum():,}"
+                f"${total_amount:,}"
             )
 
             output = io.BytesIO()
